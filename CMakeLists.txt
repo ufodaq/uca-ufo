@@ -20,6 +20,7 @@ pkg_check_variable(libuca plugindir)
 find_package(IPE REQUIRED)
 
 include_directories(
+    ${UCA_INCLUDE_DIRS}
     ${IPE_INCLUDE_DIRS}
     ${GIO2_INCLUDE_DIRS})
 
