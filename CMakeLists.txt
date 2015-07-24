@@ -13,24 +13,23 @@ add_definitions(-DG_LOG_DOMAIN="Uca-Ufo")
 
 pkg_check_modules(UCA libuca>=2.0.0 REQUIRED)
 pkg_check_modules(GIO2 gio-2.0>=2.24 REQUIRED)
+pkg_check_modules(PCITOOL pcitool>=0.2.0 REQUIRED)
 pkg_check_variable(libuca plugindir)
 
 
 # --- Plugin specific ---------------------------------------------------------
 
-find_package(IPE REQUIRED)
-
 include_directories(
     ${UCA_INCLUDE_DIRS}
-    ${IPE_INCLUDE_DIRS}
+    ${PCITOOL_INCLUDE_DIRS}
     ${GIO2_INCLUDE_DIRS})
 
 add_library(ucaufo SHARED uca-ufo-camera.c)
 
 target_link_libraries(ucaufo
     ${UCA_LIBRARIES}
-    ${GIO2_LIBRARIES}
-    ${IPE_LIBRARIES})
+    ${PCITOOL_LIBRARIES}
+    ${GIO2_LIBRARIES})
 
 install(TARGETS ucaufo
     LIBRARY DESTINATION ${LIBUCA_PLUGINDIR})

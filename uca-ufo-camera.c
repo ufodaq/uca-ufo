@@ -20,9 +20,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <pcilib.h>
 #include <errno.h>
 #include <math.h>
+#include <pcilib.h>
+#include <pcilib/model.h>
+#include <pcilib/register.h>
 #include "uca-ufo-camera.h"
 
 #define PCILIB_SET_ERROR(err, err_type)                 \
@@ -121,15 +123,12 @@ struct _UcaUfoCameraPrivate {
 };
 
 static void
-error_handler (const char *format, ...)
+error_handler (gpointer arg, const gchar *file, gint line, pcilib_log_priority_t prio, const gchar *format, va_list args)
 {
-    va_list args;
     gchar *message;
 
-    va_start (args, format);
     message = g_strdup_vprintf (format, args);
     g_warning ("%s", message);
-    va_end (args);
 }
 
 static guint
@@ -165,7 +164,7 @@ static guint
 update_properties (UcaUfoCameraPrivate *priv)
 {
     guint prop;
-    pcilib_model_description_t *description;
+    const pcilib_model_description_t *description;
 
     prop = PROP_UFO_START;
     description = pcilib_get_model_description (priv->handle);
@@ -174,7 +173,7 @@ update_properties (UcaUfoCameraPrivate *priv)
         GParamFlags flags = 0;
         RegisterInfo *reg_info;
         gchar *prop_name;
-        pcilib_register_description_t *reg;
+        const pcilib_register_description_t *reg;
         pcilib_register_value_t value;
         gint err;
 
@@ -186,10 +185,12 @@ update_properties (UcaUfoCameraPrivate *priv)
                 break;
             case PCILIB_REGISTER_W:
             case PCILIB_REGISTER_W1C:
+            case PCILIB_REGISTER_W1I:
                 flags = G_PARAM_WRITABLE;
                 break;
             case PCILIB_REGISTER_RW:
             case PCILIB_REGISTER_RW1C:
+            case PCILIB_REGISTER_RW1I:
                 flags = G_PARAM_READWRITE;
                 break;
         }
@@ -217,11 +218,9 @@ update_properties (UcaUfoCameraPrivate *priv)
 static gboolean
 setup_pcilib (UcaUfoCameraPrivate *priv)
 {
-    pcilib_model_t model;
     guint adc_resolution;
 
-    model = PCILIB_MODEL_DETECT;
-    priv->handle = pcilib_open("/dev/fpga0", model);
+    priv->handle = pcilib_open("/dev/fpga0", "ipecamera");
 
     if (priv->handle == NULL) {
         g_set_error (&priv->construct_error,
@@ -230,12 +229,12 @@ setup_pcilib (UcaUfoCameraPrivate *priv)
         return FALSE;
     }
 
-    pcilib_set_error_handler (&error_handler, &error_handler);
+    pcilib_set_logger (PCILIB_LOG_INFO, &error_handler, NULL);
 
     priv->property_table = g_hash_table_new_full (g_direct_hash, g_direct_equal,
                                                   NULL, g_free);
     N_PROPERTIES = update_properties (priv);
-    priv->height = read_register_value (priv->handle, "cmosis_number_lines") + 1;
+    priv->height = read_register_value (priv->handle, "cmosis_number_lines_single") + 1;
     priv->frequency = read_register_value (priv->handle, "control") >> 31;
     adc_resolution = read_register_value (priv->handle, "adc_resolution");
 
