@@ -15,6 +15,8 @@
    with this library; if not, write to the Free Software Foundation, Inc., 51
    Franklin St, Fifth Floor, Boston, MA 02110, USA */
 
+#include "config.h"
+
 #include <gio/gio.h>
 #include <gmodule.h>
 #include <stdlib.h>
@@ -59,7 +61,6 @@ G_DEFINE_TYPE_WITH_CODE (UcaUfoCamera, uca_ufo_camera, UCA_TYPE_CAMERA,
                          G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE,
                                                 uca_ufo_camera_initable_iface_init))
 
-static const guint SENSOR_WIDTH = 2048;
 static const gdouble EXPOSURE_TIME_SCALE = 2.69e6;
 
 /**
@@ -378,7 +379,7 @@ uca_ufo_camera_grab(UcaCamera *camera, gpointer data, GError **error)
     pcilib_event_info_t event_info;
     int err;
 
-    const gsize size = SENSOR_WIDTH * priv->height * sizeof(guint16);
+    const gsize size = CMOSIS_SENSOR_WIDTH * priv->height * sizeof(guint16);
 
     err = pcilib_get_next_event (priv->handle, PCILIB_TIMEOUT_INFINITE, &event_id, sizeof(pcilib_event_info_t), &event_info);
     PCILIB_SET_ERROR_RETURN_FALSE (err, UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
@@ -528,7 +529,7 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
 
     switch (property_id) {
         case PROP_SENSOR_WIDTH:
-            g_value_set_uint (value, SENSOR_WIDTH);
+            g_value_set_uint (value, CMOSIS_SENSOR_WIDTH);
             break;
         case PROP_SENSOR_HEIGHT:
             g_value_set_uint (value, priv->height);
@@ -588,7 +589,7 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
             g_value_set_uint (value, 0);
             break;
         case PROP_ROI_WIDTH:
-            g_value_set_uint (value, SENSOR_WIDTH);
+            g_value_set_uint (value, CMOSIS_SENSOR_WIDTH);
             break;
         case PROP_ROI_HEIGHT:
             g_value_set_uint (value, priv->height);

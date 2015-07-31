@@ -1,5 +1,3 @@
-# --- Common ------------------------------------------------------------------
-
 cmake_minimum_required(VERSION 2.6)
 project(ucapco C)
 
@@ -17,12 +15,20 @@ pkg_check_modules(PCITOOL pcitool>=0.2.0 REQUIRED)
 pkg_check_variable(libuca plugindir)
 
 
-# --- Plugin specific ---------------------------------------------------------
+if (NOT DEFINED CMOSIS_SENSOR_WIDTH)
+    set(CMOSIS_SENSOR_WIDTH "2048")
+endif ()
+
+set(CMOSIS_SENSOR_WIDTH ${CMOSIS_SENSOR_WIDTH} CACHE STRING "Width of the sensor")
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 include_directories(
     ${UCA_INCLUDE_DIRS}
     ${PCITOOL_INCLUDE_DIRS}
-    ${GIO2_INCLUDE_DIRS})
+    ${GIO2_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(ucaufo SHARED uca-ufo-camera.c)
 
