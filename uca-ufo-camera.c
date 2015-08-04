@@ -219,8 +219,6 @@ update_properties (UcaUfoCameraPrivate *priv)
 static gboolean
 setup_pcilib (UcaUfoCameraPrivate *priv)
 {
-    guint adc_resolution;
-
     priv->handle = pcilib_open("/dev/fpga0", "ipecamera");
 
     if (priv->handle == NULL) {
@@ -232,24 +230,12 @@ setup_pcilib (UcaUfoCameraPrivate *priv)
 
     pcilib_set_logger (PCILIB_LOG_INFO, &error_handler, NULL);
 
-    priv->property_table = g_hash_table_new_full (g_direct_hash, g_direct_equal,
-                                                  NULL, g_free);
+    priv->property_table = g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, g_free);
     N_PROPERTIES = update_properties (priv);
+
     priv->height = read_register_value (priv->handle, "cmosis_number_lines_single");
     priv->frequency = read_register_value (priv->handle, "control") >> 31;
-    adc_resolution = read_register_value (priv->handle, "adc_resolution");
-
-    switch (adc_resolution) {
-        case 0:
-            priv->n_bits = 10;
-            break;
-        case 1:
-            priv->n_bits = 11;
-            break;
-        case 2:
-            priv->n_bits = 12;
-            break;
-    }
+    priv->n_bits = read_register_value (priv->handle, "adc_resolution") + 10;
 
     return TRUE;
 }
