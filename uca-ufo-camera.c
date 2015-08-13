@@ -219,6 +219,8 @@ update_properties (UcaUfoCameraPrivate *priv)
 static gboolean
 setup_pcilib (UcaUfoCameraPrivate *priv)
 {
+    guint32 firmware_version;
+
     priv->handle = pcilib_open("/dev/fpga0", "ipecamera");
 
     if (priv->handle == NULL) {
@@ -233,16 +235,20 @@ setup_pcilib (UcaUfoCameraPrivate *priv)
     priv->property_table = g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, g_free);
     N_PROPERTIES = update_properties (priv);
 
-    priv->height = read_register_value (priv->handle, "cmosis_number_lines_single");
     priv->frequency = read_register_value (priv->handle, "control") >> 31;
 
     /* FIXME: this is a fix to prevent wrong assumption about the bitdepth with
-     * the CMOSIS20000 chip. This should be removed as soon as possible.
+     * the CMOSIS20000 chip and the height of the sensor in pixels. This should
+     * be removed as soon as possible.
      */
-    if (read_register_value (priv->handle, "firmware_version") == 6)
+    if (read_register_value (priv->handle, "firmware_version") == 6) {
         priv->n_bits = 12;
-    else
+        priv->height = read_register_value (priv->handle, "cmosis_number_lines_single");
+    }
+    else {
         priv->n_bits = read_register_value (priv->handle, "adc_resolution") + 10;
+        priv->height = read_register_value (priv->handle, "cmosis_number_lines");
+    }
 
     return TRUE;
 }
