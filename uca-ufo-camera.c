@@ -306,6 +306,9 @@ uca_ufo_camera_start_recording (UcaCamera *camera, GError **error)
     set_control_bit (priv, 15, trigger_type == UCA_CAMERA_TRIGGER_TYPE_EDGE &&
                                trigger_source == UCA_CAMERA_TRIGGER_SOURCE_EXTERNAL);
 
+    /* Enable readout, this should actually always set! */
+    set_control_bit (priv, 9, TRUE);
+
     err = pcilib_start (priv->handle, PCILIB_EVENT_DATA, PCILIB_EVENT_FLAGS_DEFAULT);
 
     if (transfer_async)
