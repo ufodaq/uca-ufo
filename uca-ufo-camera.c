@@ -117,6 +117,9 @@ struct _UcaUfoCameraPrivate {
     pcilib_t           *handle;
     guint               n_bits;
     guint               height;
+    guint               roi_height;
+    guint               roi_start;
+    guint               firmware;
     enum {
         FPGA_48MHZ = 0,
         FPGA_40MHZ
@@ -216,6 +219,55 @@ update_properties (UcaUfoCameraPrivate *priv)
     return prop;
 }
 
+static guint32
+read_cmosis_height (UcaUfoCameraPrivate *priv)
+{
+    /*
+     * FIXME: this is a fix to prevent wrong assumption about the height of the
+     * sensor in pixels. This should be removed as soon as possible.
+     */
+
+    if (priv->firmware > 5)
+        return read_register_value (priv->handle, "cmosis_number_lines_single");
+    else
+        return read_register_value (priv->handle, "cmosis_number_lines");
+}
+
+static guint32
+read_cmosis_start (UcaUfoCameraPrivate *priv)
+{
+    if (priv->firmware > 5)
+        return read_register_value (priv->handle, "cmosis_start_single");
+    else
+        return read_register_value (priv->handle, "cmosis_start1");
+}
+
+static void
+write_cmosis_start (UcaUfoCameraPrivate *priv, guint32 start)
+{
+    gint err;
+
+    if (priv->firmware > 5)
+        err = pcilib_write_register (priv->handle, NULL, "cmosis_start_single", start);
+    else
+        err = pcilib_write_register (priv->handle, NULL, "cmosis_start1", start);
+
+    PCILIB_WARN_ON_ERROR (err);
+}
+
+static void
+write_cmosis_height (UcaUfoCameraPrivate *priv, guint32 number)
+{
+    gint err;
+
+    if (priv->firmware > 5)
+        err = pcilib_write_register (priv->handle, NULL, "cmosis_number_lines_single", number);
+    else
+        err = pcilib_write_register (priv->handle, NULL, "cmosis_number_lines", number);
+
+    PCILIB_WARN_ON_ERROR (err);
+}
+
 static gboolean
 setup_pcilib (UcaUfoCameraPrivate *priv)
 {
@@ -233,16 +285,12 @@ setup_pcilib (UcaUfoCameraPrivate *priv)
     priv->property_table = g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, g_free);
     N_PROPERTIES = update_properties (priv);
 
+    priv->firmware = read_register_value (priv->handle, "firmware_version");
     priv->frequency = read_register_value (priv->handle, "control") >> 31;
     priv->n_bits = read_register_value (priv->handle, "adc_resolution") + 10;
-
-    /* FIXME: this is a fix to prevent wrong assumption about the height of the
-     * sensor in pixels. This should be removed as soon as possible.
-     */
-    if (read_register_value (priv->handle, "firmware_version") > 5)
-        priv->height = read_register_value (priv->handle, "cmosis_number_lines_single");
-    else
-        priv->height = read_register_value (priv->handle, "cmosis_number_lines");
+    priv->height = read_cmosis_height (priv);
+    priv->roi_height = priv->height;
+    priv->roi_start = 0;
 
     return TRUE;
 }
@@ -426,17 +474,15 @@ total_readout_time (UcaUfoCamera *camera)
     gdouble clock_period, foo;
     gdouble exposure_time, image_readout_time, overhead_time;
     guint output_mode;
-    guint roi_height;
 
     g_object_get (G_OBJECT (camera),
                   "exposure-time", &exposure_time,
                   "ufo-cmosis-output-mode", &output_mode,
-                  "roi-height", &roi_height,
                   NULL);
 
     clock_period = camera->priv->frequency == FPGA_40MHZ ? 1 / 40.0 : 1 / 48.0;
     foo = pow (2, output_mode);
-    image_readout_time = (129 * clock_period * foo) * roi_height;
+    image_readout_time = (129 * clock_period * foo) * camera->priv->roi_height;
     overhead_time = (10 /* reg73 */ + 2 * foo) * 129 * clock_period;
 
     return exposure_time + (overhead_time + image_readout_time) / 1000 / 1000;
@@ -484,12 +530,37 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
             }
             break;
         case PROP_ROI_X:
-        case PROP_ROI_Y:
         case PROP_ROI_WIDTH:
-        case PROP_ROI_HEIGHT:
-            g_debug("ROI feature not implemented yet");
+            g_warning ("Cannot change horizontal position or width");
             break;
+        case PROP_ROI_Y:
+            {
+                guint32 start;
+                start = (guint32) g_value_get_uint (value);
 
+                if (start + priv->roi_height <= priv->height) {
+                    priv->roi_start = start;
+                    write_cmosis_start (priv, start);
+                }
+                else {
+                    g_warning ("Cannot exceed ROI bounds (roi-y <= %i)", priv->height - priv->roi_height);
+                }
+            }
+            break;
+        case PROP_ROI_HEIGHT:
+            {
+                guint32 number;
+                number = (guint32) g_value_get_uint (value);
+
+                if (priv->roi_start + number <= priv->height) {
+                    priv->roi_height = number;
+                    write_cmosis_height (priv, number);
+                }
+                else {
+                    g_warning ("Cannot exceed ROI bounds (roi-height <= %i)", priv->height - priv->roi_start);
+                }
+            }
+            break;
         default:
             {
                 RegisterInfo *reg_info;
@@ -582,13 +653,13 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
             g_value_set_uint (value, 0);
             break;
         case PROP_ROI_Y:
-            g_value_set_uint (value, 0);
+            g_value_set_uint (value, priv->roi_start);
             break;
         case PROP_ROI_WIDTH:
             g_value_set_uint (value, CMOSIS_SENSOR_WIDTH);
             break;
         case PROP_ROI_HEIGHT:
-            g_value_set_uint (value, priv->height);
+            g_value_set_uint (value, priv->roi_height);
             break;
         case PROP_NAME:
             g_value_set_string (value, "Ufo Camera w/ CMOSIS CMV2000");
