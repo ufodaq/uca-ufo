@@ -116,7 +116,6 @@ struct _UcaUfoCameraPrivate {
     GThread            *async_thread;
     pcilib_t           *handle;
     guint               n_bits;
-    guint               height;
     guint               roi_height;
     guint               roi_start;
     guint               firmware;
@@ -288,9 +287,8 @@ setup_pcilib (UcaUfoCameraPrivate *priv)
     priv->firmware = read_register_value (priv->handle, "firmware_version");
     priv->frequency = read_register_value (priv->handle, "control") >> 31;
     priv->n_bits = read_register_value (priv->handle, "adc_resolution") + 10;
-    priv->height = read_cmosis_height (priv);
-    priv->roi_height = priv->height;
-    priv->roi_start = 0;
+    priv->roi_height = read_cmosis_height (priv);
+    priv->roi_start = read_cmosis_start (priv);
 
     return TRUE;
 }
@@ -423,7 +421,7 @@ uca_ufo_camera_grab(UcaCamera *camera, gpointer data, GError **error)
     pcilib_event_info_t event_info;
     int err;
 
-    const gsize size = CMOSIS_SENSOR_WIDTH * priv->height * sizeof(guint16);
+    const gsize size = CMOSIS_SENSOR_WIDTH * priv->roi_height * sizeof(guint16);
 
     err = pcilib_get_next_event (priv->handle, PCILIB_TIMEOUT_INFINITE, &event_id, sizeof(pcilib_event_info_t), &event_info);
     PCILIB_SET_ERROR_RETURN_FALSE (err, UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
@@ -538,12 +536,12 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
                 guint32 start;
                 start = (guint32) g_value_get_uint (value);
 
-                if (start + priv->roi_height <= priv->height) {
+                if (start + priv->roi_height <= CMOSIS_SENSOR_HEIGHT) {
                     priv->roi_start = start;
                     write_cmosis_start (priv, start);
                 }
                 else {
-                    g_warning ("Cannot exceed ROI bounds (roi-y <= %i)", priv->height - priv->roi_height);
+                    g_warning ("Cannot exceed ROI bounds (roi-y <= %i)", CMOSIS_SENSOR_HEIGHT - priv->roi_height);
                 }
             }
             break;
@@ -552,12 +550,12 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
                 guint32 number;
                 number = (guint32) g_value_get_uint (value);
 
-                if (priv->roi_start + number <= priv->height) {
+                if (priv->roi_start + number <= CMOSIS_SENSOR_HEIGHT) {
                     priv->roi_height = number;
                     write_cmosis_height (priv, number);
                 }
                 else {
-                    g_warning ("Cannot exceed ROI bounds (roi-height <= %i)", priv->height - priv->roi_start);
+                    g_warning ("Cannot exceed ROI bounds (roi-height <= %i)", CMOSIS_SENSOR_HEIGHT - priv->roi_start);
                 }
             }
             break;
@@ -599,7 +597,7 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
             g_value_set_uint (value, CMOSIS_SENSOR_WIDTH);
             break;
         case PROP_SENSOR_HEIGHT:
-            g_value_set_uint (value, priv->height);
+            g_value_set_uint (value, CMOSIS_SENSOR_HEIGHT);
             break;
         case PROP_SENSOR_BITDEPTH:
             g_value_set_uint (value, priv->n_bits);
