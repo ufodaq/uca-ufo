@@ -145,6 +145,15 @@ read_register_value (pcilib_t *handle, const gchar *name)
     return (guint) reg_value;
 }
 
+static void
+write_register_value (pcilib_t *handle, const gchar *name, pcilib_register_value_t value)
+{
+    int err;
+
+    err = pcilib_write_register (handle, NULL, name, value);
+    PCILIB_WARN_ON_ERROR (err);
+}
+
 static int
 event_callback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user)
 {
@@ -235,27 +244,13 @@ read_cmosis_start (UcaUfoCameraPrivate *priv)
 static void
 write_cmosis_start (UcaUfoCameraPrivate *priv, guint32 start)
 {
-    gint err;
-
-    if (priv->firmware > 5)
-        err = pcilib_write_register (priv->handle, NULL, "cmosis_start_single", start);
-    else
-        err = pcilib_write_register (priv->handle, NULL, "cmosis_start1", start);
-
-    PCILIB_WARN_ON_ERROR (err);
+    write_register_value (priv->handle, priv->firmware > 5 ? "cmosis_start_single" : "cmosis_start1", start);
 }
 
 static void
 write_cmosis_height (UcaUfoCameraPrivate *priv, guint32 number)
 {
-    gint err;
-
-    if (priv->firmware > 5)
-        err = pcilib_write_register (priv->handle, NULL, "cmosis_number_lines_single", number);
-    else
-        err = pcilib_write_register (priv->handle, NULL, "cmosis_number_lines", number);
-
-    PCILIB_WARN_ON_ERROR (err);
+    write_register_value (priv->handle, priv->firmware > 5 ? "cmosis_number_lines_single" : "cmosis_number_lines", number);
 }
 
 static gboolean
@@ -290,7 +285,6 @@ set_control_bit (UcaUfoCameraPrivate *priv, guint bit, gboolean set)
     static const gchar *name = "control";
     pcilib_register_value_t flags;
     pcilib_register_value_t mask;
-    gint err;
 
     flags = read_register_value (priv->handle, name);
     mask = 1 << bit;
@@ -300,8 +294,7 @@ set_control_bit (UcaUfoCameraPrivate *priv, guint bit, gboolean set)
     else
         flags = flags & ~mask;
 
-    err = pcilib_write_register (priv->handle, NULL, name, flags);
-    PCILIB_WARN_ON_ERROR (err);
+    write_register_value (priv->handle, name, flags);
 }
 
 static gpointer
@@ -491,11 +484,9 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
             {
                 const guint frequency = priv->frequency == FPGA_40MHZ ? 40 : 48;
                 const gdouble user_exposure_time = g_value_get_double(value);
-                gint err;
 
                 pcilib_register_value_t reg_value = (pcilib_register_value_t) (1e6 * user_exposure_time * frequency / 129.0 - 0.43 * 10);
-                err = pcilib_write_register(priv->handle, NULL, "cmosis_exp_time", reg_value);
-                PCILIB_WARN_ON_ERROR (err);
+                write_register_value (priv->handle, "cmosis_exp_time", reg_value);
             }
             break;
         case PROP_FRAMES_PER_SECOND:
@@ -557,12 +548,9 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
 
                 if (reg_info != NULL) {
                     pcilib_register_value_t reg_value = 0;
-                    gint err;
 
                     reg_value = g_value_get_uint (value);
-
-                    err = pcilib_write_register (priv->handle, NULL, reg_info->name, reg_value);
-                    PCILIB_WARN_ON_ERROR (err);
+                    write_register_value (priv->handle, reg_info->name, reg_value);
 
                     reg_value = read_register_value (priv->handle, reg_info->name);
                     reg_info->cached_value = (guint) reg_value;
