@@ -140,7 +140,7 @@ read_register_value (pcilib_t *handle, const gchar *name)
     pcilib_register_value_t reg_value;
     int err;
 
-    err = pcilib_read_register(handle, NULL, name, &reg_value);
+    err = pcilib_read_register (handle, NULL, name, &reg_value);
     PCILIB_WARN_ON_ERROR (err);
     return (guint) reg_value;
 }
@@ -178,7 +178,6 @@ update_properties (UcaUfoCameraPrivate *priv)
         gchar *prop_name;
         const pcilib_register_description_t *reg;
         pcilib_register_value_t value;
-        gint err;
 
         reg = &description->registers[i];
 
@@ -198,8 +197,7 @@ update_properties (UcaUfoCameraPrivate *priv)
                 break;
         }
 
-        err = pcilib_read_register (priv->handle, NULL, reg->name, &value);
-        PCILIB_WARN_ON_ERROR (err);
+        value = read_register_value (priv->handle, reg->name);
 
         reg_info = g_new0 (RegisterInfo, 1);
         reg_info->name = g_strdup (reg->name);
@@ -225,20 +223,13 @@ read_cmosis_height (UcaUfoCameraPrivate *priv)
      * FIXME: this is a fix to prevent wrong assumption about the height of the
      * sensor in pixels. This should be removed as soon as possible.
      */
-
-    if (priv->firmware > 5)
-        return read_register_value (priv->handle, "cmosis_number_lines_single");
-    else
-        return read_register_value (priv->handle, "cmosis_number_lines");
+    return read_register_value (priv->handle, priv->firmware > 5 ? "cmosis_number_lines_single" : "cmosis_number_lines");
 }
 
 static guint32
 read_cmosis_start (UcaUfoCameraPrivate *priv)
 {
-    if (priv->firmware > 5)
-        return read_register_value (priv->handle, "cmosis_start_single");
-    else
-        return read_register_value (priv->handle, "cmosis_start1");
+    return read_register_value (priv->handle, priv->firmware > 5 ? "cmosis_start_single" : "cmosis_start1");
 }
 
 static void
@@ -301,9 +292,7 @@ set_control_bit (UcaUfoCameraPrivate *priv, guint bit, gboolean set)
     pcilib_register_value_t mask;
     gint err;
 
-    err = pcilib_read_register (priv->handle, NULL, name, &flags);
-    PCILIB_WARN_ON_ERROR (err);
-
+    flags = read_register_value (priv->handle, name);
     mask = 1 << bit;
 
     if (set)
@@ -575,9 +564,7 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
                     err = pcilib_write_register (priv->handle, NULL, reg_info->name, reg_value);
                     PCILIB_WARN_ON_ERROR (err);
 
-                    err = pcilib_read_register (priv->handle, NULL, reg_info->name, &reg_value);
-                    PCILIB_WARN_ON_ERROR (err);
-
+                    reg_value = read_register_value (priv->handle, reg_info->name);
                     reg_info->cached_value = (guint) reg_value;
                 }
                 else
