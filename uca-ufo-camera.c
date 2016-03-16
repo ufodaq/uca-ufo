@@ -762,7 +762,7 @@ uca_ufo_camera_init(UcaUfoCamera *self)
 }
 
 G_MODULE_EXPORT GType
-uca_camera_get_type (void)
+camera_plugin_get_type (void)
 {
     return UCA_TYPE_UFO_CAMERA;
 }
