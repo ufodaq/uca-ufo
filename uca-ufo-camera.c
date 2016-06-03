@@ -328,7 +328,6 @@ uca_ufo_camera_start_recording (UcaCamera *camera, GError **error)
                   "trigger-type", &trigger_type,
                   NULL);
 
-    set_control_bit (priv, 3, trigger_source == UCA_CAMERA_TRIGGER_SOURCE_SOFTWARE);
     set_control_bit (priv, 11, trigger_source == UCA_CAMERA_TRIGGER_SOURCE_AUTO);
     set_control_bit (priv, 14, trigger_source == UCA_CAMERA_TRIGGER_SOURCE_EXTERNAL);
     set_control_bit (priv, 15, trigger_type == UCA_CAMERA_TRIGGER_TYPE_EDGE &&
@@ -442,6 +441,9 @@ uca_ufo_camera_trigger (UcaCamera *camera, GError **error)
     g_return_if_fail (UCA_IS_UFO_CAMERA(camera));
 
     priv = UCA_UFO_CAMERA_GET_PRIVATE(camera);
+
+    set_control_bit (priv, 3, TRUE);
+    set_control_bit (priv, 3, FALSE);
 
     /* XXX: What is PCILIB_EVENT0? */
     err = pcilib_trigger (priv->handle, PCILIB_EVENT0, 0, NULL);
