@@ -659,12 +659,14 @@ uca_ufo_camera_finalize(GObject *object)
 
     priv = UCA_UFO_CAMERA_GET_PRIVATE (object);
 
-    int err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
-    PCILIB_WARN_ON_ERROR (err);
+    if (priv->handle != NULL) {
+        int err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
+        PCILIB_WARN_ON_ERROR (err);
 
-    pcilib_close (priv->handle);
+        pcilib_close (priv->handle);
+    }
+
     g_clear_error (&priv->construct_error);
-
     G_OBJECT_CLASS (uca_ufo_camera_parent_class)->finalize (object);
 }
 
