@@ -155,7 +155,7 @@ write_register_value (pcilib_t *handle, const gchar *name, pcilib_register_value
 }
 
 static int
-event_callback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user)
+event_callback(pcilib_event_id_t event_id, const pcilib_event_info_t *info, void *user)
 {
     UcaCamera *camera = UCA_CAMERA(user);
     UcaUfoCameraPrivate *priv = UCA_UFO_CAMERA_GET_PRIVATE(camera);
@@ -203,6 +203,9 @@ update_properties (UcaUfoCameraPrivate *priv)
             case PCILIB_REGISTER_RW1C:
             case PCILIB_REGISTER_RW1I:
                 flags = G_PARAM_READWRITE;
+                break;
+            case PCILIB_REGISTER_INCONSISTENT:
+                g_warning ("%s is an inconsistent register, don't know how to handle that", reg->name);
                 break;
         }
 
