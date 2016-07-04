@@ -81,6 +81,7 @@ GQuark uca_ufo_camera_error_quark()
 enum {
     PROP_SENSOR_TEMPERATURE = N_BASE_PROPERTIES,
     PROP_FPGA_TEMPERATURE,
+    PROP_TIMEOUT,
     PROP_UFO_START,
     N_MAX_PROPERTIES = 512
 };
@@ -115,6 +116,7 @@ struct _UcaUfoCameraPrivate {
     GHashTable         *property_table; /* maps from prop_id to RegisterInfo* */
     GThread            *async_thread;
     pcilib_t           *handle;
+    pcilib_timeout_t    timeout;
     guint               n_bits;
     guint               roi_height;
     guint               roi_start;
@@ -407,7 +409,7 @@ uca_ufo_camera_grab(UcaCamera *camera, gpointer data, GError **error)
 
     const gsize size = CMOSIS_SENSOR_WIDTH * priv->roi_height * sizeof(guint16);
 
-    err = pcilib_get_next_event (priv->handle, PCILIB_TIMEOUT_INFINITE, &event_id, sizeof(pcilib_event_info_t), &event_info);
+    err = pcilib_get_next_event (priv->handle, priv->timeout, &event_id, sizeof(pcilib_event_info_t), &event_info);
     PCILIB_SET_ERROR_RETURN_FALSE (err, UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
 
     gpointer src = pcilib_get_data (priv->handle, event_id, PCILIB_EVENT_DATA, (size_t *) &err);
@@ -544,6 +546,9 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
                 }
             }
             break;
+        case PROP_TIMEOUT:
+            priv->timeout = g_value_get_uint64 (value);
+            break;
         default:
             {
                 RegisterInfo *reg_info;
@@ -641,6 +646,9 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
             break;
         case PROP_NAME:
             g_value_set_string (value, "Ufo Camera w/ CMOSIS CMV2000");
+            break;
+        case PROP_TIMEOUT:
+            g_value_set_uint64 (value, priv->timeout);
             break;
         default:
             {
@@ -741,6 +749,13 @@ uca_ufo_camera_class_init(UcaUfoCameraClass *klass)
             -G_MAXDOUBLE, G_MAXDOUBLE, 0.0,
             G_PARAM_READABLE);
 
+    ufo_properties[PROP_TIMEOUT] =
+        g_param_spec_uint64("timeout",
+            "Timeout in milliseconds",
+            "Timeout in milliseconds",
+            0, G_MAXUINT64, 5000,
+            G_PARAM_READWRITE);
+
     g_type_class_add_private(klass, sizeof(UcaUfoCameraPrivate));
 }
 
@@ -754,6 +769,7 @@ uca_ufo_camera_init(UcaUfoCamera *self)
     self->priv = priv = UCA_UFO_CAMERA_GET_PRIVATE(self);
     priv->construct_error = NULL;
     priv->async_thread = NULL;
+    priv->timeout = 5000;
 
     if (!setup_pcilib (priv))
         return;
