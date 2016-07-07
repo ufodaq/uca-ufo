@@ -357,7 +357,6 @@ static void
 uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
 {
     UcaUfoCameraPrivate *priv;
-    UcaCameraTriggerSource trigger_source;
     pcilib_event_id_t event_id;
     pcilib_event_info_t event_info;
     int err;
@@ -369,8 +368,6 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
     set_control_bit (priv, 14, FALSE);  /* disable external trigger */
     set_control_bit (priv, 11, FALSE);  /* disable streaming */
 
-    g_object_get (G_OBJECT (camera), "trigger-source", &trigger_source, NULL);
-
     if (priv->async_thread) {
         err = pcilib_stop(priv->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
         PCILIB_SET_ERROR(err, UCA_UFO_CAMERA_ERROR_STOP_RECORDING);
@@ -379,7 +376,7 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
     }
 
     /* read stale frames ... */
-    while (!pcilib_get_next_event (priv->handle, 0, &event_id, sizeof (pcilib_event_info_t), &event_info))
+    while (!pcilib_get_next_event (priv->handle, priv->timeout, &event_id, sizeof (pcilib_event_info_t), &event_info))
         ;
 
     err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
@@ -410,6 +407,17 @@ uca_ufo_camera_grab(UcaCamera *camera, gpointer data, GError **error)
     const gsize size = CMOSIS_SENSOR_WIDTH * priv->roi_height * sizeof(guint16);
 
     err = pcilib_get_next_event (priv->handle, priv->timeout, &event_id, sizeof(pcilib_event_info_t), &event_info);
+
+    /*
+     * Try to recover from errors by flushing pending requests. This is curing
+     * symptoms but not the actual problem.
+     */
+    if (err != 0) {
+        set_control_bit (priv, 2, TRUE);
+        g_usleep (10);
+        set_control_bit (priv, 2, FALSE);
+    }
+
     PCILIB_SET_ERROR_RETURN_FALSE (err, UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
 
     gpointer src = pcilib_get_data (priv->handle, event_id, PCILIB_EVENT_DATA, (size_t *) &err);
@@ -769,7 +777,7 @@ uca_ufo_camera_init(UcaUfoCamera *self)
     self->priv = priv = UCA_UFO_CAMERA_GET_PRIVATE(self);
     priv->construct_error = NULL;
     priv->async_thread = NULL;
-    priv->timeout = 5000;
+    priv->timeout = 100000;
 
     if (!setup_pcilib (priv))
         return;
