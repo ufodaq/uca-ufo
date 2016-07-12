@@ -761,7 +761,7 @@ uca_ufo_camera_class_init(UcaUfoCameraClass *klass)
         g_param_spec_uint64("timeout",
             "Timeout in milliseconds",
             "Timeout in milliseconds",
-            0, G_MAXUINT64, 5000,
+            0, G_MAXUINT64, 100000,
             G_PARAM_READWRITE);
 
     g_type_class_add_private(klass, sizeof(UcaUfoCameraPrivate));
