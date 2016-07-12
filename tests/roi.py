@@ -24,7 +24,8 @@ def grab(camera, height=3840, offset=0):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device', '-d', type=str, help="TANGO device path")
+    parser.add_argument('--device', '-d', type=str, required=True,
+                        help="TANGO device path")
 
     args = parser.parse_args()
 

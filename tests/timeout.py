@@ -31,7 +31,8 @@ def grab(camera, timeout, do_trigger):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device', '-d', type=str, help="TANGO device path")
+    parser.add_argument('--device', '-d', type=str, required=True,
+                        help="TANGO device path")
 
     args = parser.parse_args()
 
