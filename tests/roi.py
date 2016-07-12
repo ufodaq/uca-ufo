@@ -30,6 +30,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     camera = PyTango.DeviceProxy(args.device)
+    camera.trigger_source = 0
 
     grab(camera)
     grab(camera, height=3640)
