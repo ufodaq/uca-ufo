@@ -52,6 +52,8 @@ include_directories(
     ${GIO2_INCLUDE_DIRS}
     ${CMAKE_CURRENT_BINARY_DIR})
 
+link_directories(${UCA_LIBRARY_DIRS})
+
 add_library(ucaufo SHARED uca-ufo-camera.c)
 
 target_link_libraries(ucaufo

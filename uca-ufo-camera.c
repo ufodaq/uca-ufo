@@ -81,6 +81,7 @@ GQuark uca_ufo_camera_error_quark()
 enum {
     PROP_SENSOR_TEMPERATURE = N_BASE_PROPERTIES,
     PROP_FPGA_TEMPERATURE,
+    PROP_TIMEOUT,
     PROP_UFO_START,
     N_MAX_PROPERTIES = 512
 };
@@ -115,6 +116,7 @@ struct _UcaUfoCameraPrivate {
     GHashTable         *property_table; /* maps from prop_id to RegisterInfo* */
     GThread            *async_thread;
     pcilib_t           *handle;
+    pcilib_timeout_t    timeout;
     guint               n_bits;
     guint               roi_height;
     guint               roi_start;
@@ -203,6 +205,9 @@ update_properties (UcaUfoCameraPrivate *priv)
             case PCILIB_REGISTER_RW1C:
             case PCILIB_REGISTER_RW1I:
                 flags = G_PARAM_READWRITE;
+                break;
+            case PCILIB_REGISTER_INCONSISTENT:
+                g_warning ("%s is an inconsistent register, don't know how to handle that", reg->name);
                 break;
         }
 
@@ -328,7 +333,6 @@ uca_ufo_camera_start_recording (UcaCamera *camera, GError **error)
                   "trigger-type", &trigger_type,
                   NULL);
 
-    set_control_bit (priv, 3, trigger_source == UCA_CAMERA_TRIGGER_SOURCE_SOFTWARE);
     set_control_bit (priv, 11, trigger_source == UCA_CAMERA_TRIGGER_SOURCE_AUTO);
     set_control_bit (priv, 14, trigger_source == UCA_CAMERA_TRIGGER_SOURCE_EXTERNAL);
     set_control_bit (priv, 15, trigger_type == UCA_CAMERA_TRIGGER_TYPE_EDGE &&
@@ -353,7 +357,6 @@ static void
 uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
 {
     UcaUfoCameraPrivate *priv;
-    UcaCameraTriggerSource trigger_source;
     pcilib_event_id_t event_id;
     pcilib_event_info_t event_info;
     int err;
@@ -365,8 +368,6 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
     set_control_bit (priv, 14, FALSE);  /* disable external trigger */
     set_control_bit (priv, 11, FALSE);  /* disable streaming */
 
-    g_object_get (G_OBJECT (camera), "trigger-source", &trigger_source, NULL);
-
     if (priv->async_thread) {
         err = pcilib_stop(priv->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
         PCILIB_SET_ERROR(err, UCA_UFO_CAMERA_ERROR_STOP_RECORDING);
@@ -375,7 +376,7 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
     }
 
     /* read stale frames ... */
-    while (!pcilib_get_next_event (priv->handle, 0, &event_id, sizeof (pcilib_event_info_t), &event_info))
+    while (!pcilib_get_next_event (priv->handle, priv->timeout, &event_id, sizeof (pcilib_event_info_t), &event_info))
         ;
 
     err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
@@ -405,7 +406,18 @@ uca_ufo_camera_grab(UcaCamera *camera, gpointer data, GError **error)
 
     const gsize size = CMOSIS_SENSOR_WIDTH * priv->roi_height * sizeof(guint16);
 
-    err = pcilib_get_next_event (priv->handle, PCILIB_TIMEOUT_INFINITE, &event_id, sizeof(pcilib_event_info_t), &event_info);
+    err = pcilib_get_next_event (priv->handle, priv->timeout, &event_id, sizeof(pcilib_event_info_t), &event_info);
+
+    /*
+     * Try to recover from errors by flushing pending requests. This is curing
+     * symptoms but not the actual problem.
+     */
+    if (err != 0) {
+        set_control_bit (priv, 2, TRUE);
+        g_usleep (10);
+        set_control_bit (priv, 2, FALSE);
+    }
+
     PCILIB_SET_ERROR_RETURN_FALSE (err, UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
 
     gpointer src = pcilib_get_data (priv->handle, event_id, PCILIB_EVENT_DATA, (size_t *) &err);
@@ -442,6 +454,9 @@ uca_ufo_camera_trigger (UcaCamera *camera, GError **error)
     g_return_if_fail (UCA_IS_UFO_CAMERA(camera));
 
     priv = UCA_UFO_CAMERA_GET_PRIVATE(camera);
+
+    set_control_bit (priv, 3, TRUE);
+    set_control_bit (priv, 3, FALSE);
 
     /* XXX: What is PCILIB_EVENT0? */
     err = pcilib_trigger (priv->handle, PCILIB_EVENT0, 0, NULL);
@@ -538,6 +553,9 @@ uca_ufo_camera_set_property(GObject *object, guint property_id, const GValue *va
                     g_warning ("Cannot exceed ROI bounds (roi-height <= %i)", CMOSIS_SENSOR_HEIGHT - priv->roi_start);
                 }
             }
+            break;
+        case PROP_TIMEOUT:
+            priv->timeout = g_value_get_uint64 (value);
             break;
         default:
             {
@@ -637,6 +655,9 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
         case PROP_NAME:
             g_value_set_string (value, "Ufo Camera w/ CMOSIS CMV2000");
             break;
+        case PROP_TIMEOUT:
+            g_value_set_uint64 (value, priv->timeout);
+            break;
         default:
             {
                 RegisterInfo *reg_info = g_hash_table_lookup (priv->property_table, GINT_TO_POINTER (property_id));
@@ -657,12 +678,14 @@ uca_ufo_camera_finalize(GObject *object)
 
     priv = UCA_UFO_CAMERA_GET_PRIVATE (object);
 
-    int err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
-    PCILIB_WARN_ON_ERROR (err);
+    if (priv->handle != NULL) {
+        int err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
+        PCILIB_WARN_ON_ERROR (err);
 
-    pcilib_close (priv->handle);
+        pcilib_close (priv->handle);
+    }
+
     g_clear_error (&priv->construct_error);
-
     G_OBJECT_CLASS (uca_ufo_camera_parent_class)->finalize (object);
 }
 
@@ -734,6 +757,13 @@ uca_ufo_camera_class_init(UcaUfoCameraClass *klass)
             -G_MAXDOUBLE, G_MAXDOUBLE, 0.0,
             G_PARAM_READABLE);
 
+    ufo_properties[PROP_TIMEOUT] =
+        g_param_spec_uint64("timeout",
+            "Timeout in milliseconds",
+            "Timeout in milliseconds",
+            0, G_MAXUINT64, 100000,
+            G_PARAM_READWRITE);
+
     g_type_class_add_private(klass, sizeof(UcaUfoCameraPrivate));
 }
 
@@ -747,6 +777,7 @@ uca_ufo_camera_init(UcaUfoCamera *self)
     self->priv = priv = UCA_UFO_CAMERA_GET_PRIVATE(self);
     priv->construct_error = NULL;
     priv->async_thread = NULL;
+    priv->timeout = 100000;
 
     if (!setup_pcilib (priv))
         return;
@@ -762,7 +793,7 @@ uca_ufo_camera_init(UcaUfoCamera *self)
 }
 
 G_MODULE_EXPORT GType
-uca_camera_get_type (void)
+camera_plugin_get_type (void)
 {
     return UCA_TYPE_UFO_CAMERA;
 }
