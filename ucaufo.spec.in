@@ -1,0 +1,42 @@
+Summary: UFO Camera plugin for LibUCA
+Name: ucaufo
+Version: ${CPACK_PACKAGE_VERSION}
+Release: csa
+License: GPL-3.0
+Group: Development/Libraries
+Source: ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
+URL: http://darksoft.org
+Prefix: %{_prefix}
+Docdir: %{_docdir}
+Requires: libuca >= ${UCA_VERSION}
+BuildRequires: uthash
+BuildRequires: libuca-devel libpcilib-devel
+BuildRequires: pkg-config libtool cmake
+Vendor: Institute for Data Processing and Electronics, KIT
+Packager: Suren A. Chilingaryan <csa@suren.me>
+
+%description
+This package provides an UFO Camera plugin for LibUCA.
+
+%prep
+%setup -q
+
+%build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .
+make
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files 
+%defattr(-, root, root)
+${LIBUCA_PLUGINDIR}/libucaufo.so
+
+%changelog
+* Fri Mar  4 2016 Suren A. Chilingaryan <csa@suren.me> - ${CPACK_PACKAGE_VERSION}
+- Added spec file to the sources

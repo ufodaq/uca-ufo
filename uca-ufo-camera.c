@@ -155,7 +155,7 @@ write_register_value (pcilib_t *handle, const gchar *name, pcilib_register_value
 }
 
 static int
-event_callback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user)
+event_callback(pcilib_event_id_t event_id, const pcilib_event_info_t *info, void *user)
 {
     UcaCamera *camera = UCA_CAMERA(user);
     UcaUfoCameraPrivate *priv = UCA_UFO_CAMERA_GET_PRIVATE(camera);
@@ -190,7 +190,7 @@ update_properties (UcaUfoCameraPrivate *priv)
 
         reg = &description->registers[i];
 
-        switch (reg->mode) {
+        switch (reg->mode&(PCILIB_REGISTER_RW|PCILIB_REGISTER_W1C|PCILIB_REGISTER_W1I)) {
             case PCILIB_REGISTER_R:
                 flags = G_PARAM_READABLE;
                 break;
@@ -340,7 +340,7 @@ uca_ufo_camera_start_recording (UcaCamera *camera, GError **error)
     err = pcilib_start (priv->handle, PCILIB_EVENT_DATA, PCILIB_EVENT_FLAGS_DEFAULT);
 
     if (transfer_async)
-        priv->async_thread = g_thread_create ((GThreadFunc) stream_async, camera, TRUE, error);
+        priv->async_thread = g_thread_new ("async-thread", (GThreadFunc) stream_async, camera);
 
     if (err != 0) {
         g_set_error (&priv->construct_error,
