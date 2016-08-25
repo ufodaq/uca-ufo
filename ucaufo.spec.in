@@ -10,7 +10,7 @@ URL: http://darksoft.org
 Prefix: %{_prefix}
 Docdir: %{_docdir}
 Requires: libuca >= ${UCA_VERSION}
-BuildRequires: uthash
+BuildRequires: uthash-devel
 BuildRequires: libuca-devel libpcilib-devel
 BuildRequires: pkg-config libtool cmake
 Vendor: Institute for Data Processing and Electronics, KIT
