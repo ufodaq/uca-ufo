@@ -418,7 +418,7 @@ uca_ufo_camera_grab(UcaCamera *camera, gpointer data, GError **error)
         set_control_bit (priv, 2, FALSE);
     }
 
-    PCILIB_SET_ERROR_RETURN_FALSE (err, UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
+    PCILIB_SET_ERROR_RETURN_FALSE (err, err == ETIME ? UCA_CAMERA_ERROR_TIMEOUT : UCA_UFO_CAMERA_ERROR_NEXT_EVENT);
 
     gpointer src = pcilib_get_data (priv->handle, event_id, PCILIB_EVENT_DATA, (size_t *) &err);
 
