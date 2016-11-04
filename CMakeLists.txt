@@ -46,3 +46,6 @@ target_link_libraries(ucaufo
 
 install(TARGETS ucaufo
     LIBRARY DESTINATION ${LIBUCA_PLUGINDIR})
+
+add_executable(test tests/test.c)
+target_link_libraries(test ucaufo)
