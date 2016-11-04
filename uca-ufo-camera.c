@@ -206,9 +206,6 @@ update_properties (UcaUfoCameraPrivate *priv)
             case PCILIB_REGISTER_RW1I:
                 flags = G_PARAM_READWRITE;
                 break;
-            case PCILIB_REGISTER_INCONSISTENT:
-                g_warning ("%s is an inconsistent register, don't know how to handle that", reg->name);
-                break;
         }
 
         value = read_register_value (priv->handle, reg->name);
