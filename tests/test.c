@@ -62,8 +62,10 @@ check_roi_size (UcaCamera *camera, guint x, guint y, guint width, guint height, 
     for (guint i = 0; i < 30; i++) {
         uca_camera_grab (camera, frame, error);
 
-        if (*error != NULL)
+        if (*error != NULL) {
+            uca_camera_stop_recording (camera, NULL);
             goto exit_check_roi_size;
+        }
     }
 
     uca_camera_stop_recording (camera, error);
