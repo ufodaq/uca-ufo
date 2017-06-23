@@ -366,9 +366,9 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
     set_control_bit (priv, 11, FALSE);  /* disable streaming */
 
     if (priv->async_thread) {
-        err = pcilib_stop(priv->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
-        PCILIB_SET_ERROR(err, UCA_UFO_CAMERA_ERROR_STOP_RECORDING);
-        g_thread_join(priv->async_thread);
+        err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
+        PCILIB_SET_ERROR (err, UCA_UFO_CAMERA_ERROR_STOP_RECORDING);
+        g_thread_join (priv->async_thread);
         priv->async_thread = NULL;
     }
 
@@ -377,7 +377,7 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
         ;
 
     err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
-    PCILIB_SET_ERROR(err, UCA_UFO_CAMERA_ERROR_STOP_RECORDING);
+    PCILIB_SET_ERROR (err, UCA_UFO_CAMERA_ERROR_STOP_RECORDING);
 }
 
 static void
