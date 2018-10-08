@@ -288,7 +288,12 @@ set_control_bit (UcaUfoCameraPrivate *priv, guint bit, gboolean set)
     pcilib_register_value_t flags;
     pcilib_register_value_t mask;
 
-    flags = read_register_value (priv->handle, name);
+    do {
+	flags = read_register_value (priv->handle, name);
+	usleep(10000);
+//	printf("%lx\n", flags);
+    } while ((flags&0xffffffff) == 0xffffffff);
+
     mask = 1 << bit;
 
     if (set)
