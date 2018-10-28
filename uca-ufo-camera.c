@@ -17,12 +17,15 @@
 
 #include "config.h"
 
+#define _XOPEN_SOURCE 500
+
 #include <gio/gio.h>
 #include <gmodule.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <math.h>
 #include <pcilib.h>
 #include <pcilib/model.h>
@@ -90,6 +93,8 @@ static gint base_overrideables[] = {
     PROP_NAME,
     PROP_SENSOR_WIDTH,
     PROP_SENSOR_HEIGHT,
+    PROP_SENSOR_PIXEL_WIDTH,
+    PROP_SENSOR_PIXEL_HEIGHT,
     PROP_SENSOR_BITDEPTH,
     PROP_EXPOSURE_TIME,
     PROP_FRAMES_PER_SECOND,
@@ -594,6 +599,12 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
         case PROP_SENSOR_HEIGHT:
             g_value_set_uint (value, CMOSIS_SENSOR_HEIGHT);
             break;
+        case PROP_SENSOR_PIXEL_WIDTH:
+            g_value_set_double (value, CMOSIS_PIXEL_WIDTH);
+            break;
+        case PROP_SENSOR_PIXEL_HEIGHT:
+            g_value_set_double (value, CMOSIS_PIXEL_HEIGHT);
+            break;
         case PROP_SENSOR_BITDEPTH:
             g_value_set_uint (value, priv->n_bits);
             break;
@@ -655,7 +666,7 @@ uca_ufo_camera_get_property(GObject *object, guint property_id, GValue *value, G
             g_value_set_uint (value, priv->roi_height);
             break;
         case PROP_NAME:
-            g_value_set_string (value, "Ufo Camera w/ CMOSIS CMV2000");
+            g_value_set_string (value, CMOSIS_SENSOR_NAME);
             break;
         case PROP_TIMEOUT:
             g_value_set_uint64 (value, priv->timeout);
