@@ -378,7 +378,7 @@ uca_ufo_camera_stop_recording (UcaCamera *camera, GError **error)
     }
 
     /* read stale frames ... */
-    while (!pcilib_get_next_event (priv->handle, priv->timeout, &event_id, sizeof (pcilib_event_info_t), &event_info))
+    while (!pcilib_get_next_event (priv->handle, PCILIB_TIMEOUT_IMMEDIATE, &event_id, sizeof (pcilib_event_info_t), &event_info))
         ;
 
     err = pcilib_stop (priv->handle, PCILIB_EVENT_FLAGS_DEFAULT);
